@@ -12,6 +12,7 @@ TLB_SIZE = 16
 TLB = []
 PageTable = []
 backingStore = []
+Memory = []
 
 def main(argv):
     FRAMES = 256
@@ -55,8 +56,57 @@ def getVirtualAddresses(filename):
     file.close()
     return vAddresses
 
-def FIFO(vAddresses, frames):
+def isInTlb(virtual):
     return
+
+def isInPageTable(virtual):
+    return
+
+def FIFO(vAddresses, frames):
+    results = []
+    pageHits = 0
+    pageAccessed = 0
+    tlbHits = 0
+    tlbAccessed = 0
+    frame = 0
+    for virtual in vAddresses:
+        # calculate page number and page offset
+        pageNumber = virtual / PAGE_SIZE
+        offset = virtual % PAGE_SIZE
+        tlbAccessed += 1
+        # Checks if virtual address is already stored in TLB
+        if isInTlb(virtual):
+            tlbHits += 1
+            # Need to get byte at that offset
+            byteValue = Memory[pageNumber]
+            results.append(Reference_Sequence(virtual, byteValue, frame, Memory[pageNumber]))
+            continue
+        pageAccessed += 1
+        if isInPageTable(virtual):
+            pageHits += 1
+            if len(TLB) > TLB_SIZE:
+                TLB.pop(0)
+            TLB.append(TLB_Entry(pageNumber, frame))
+            # Need to get byte value at that offset
+            byteValue = Memory[pageNumber]
+            results.append(Reference_Sequence(virtual, byteValue, frame, Memory[pageNumber]))
+            continue
+        # FIFO page replacement alg
+        else:
+            if frame <= frames - 1:
+                PageTable.append(PageTable_Entry(pageNumber, frame, 1))
+            else:
+                frame = 0
+                PageTable.pop(0)
+                PageTable.append(PageTable_Entry(pageNumber, frame, 1))
+            Memory[pageNumber] = backingStore[pageNumber]
+    exportReferenceSequence(results, pageHits, pageAccessed, tlbHits, tlbAccessed)
+
+def exportReferenceSequence(results, pageHits, pageAccessed, tlbHits, tlbAccessed):
+    for result in results:
+        print(result)
+    tlbMisses = tlbAccessed - tlbHits
+    pageFaults = pageAccessed - pageHits
 
 def OPT(vAddresses, frames):
     return
@@ -74,6 +124,14 @@ class PageTable_Entry:
         self.page = page
         self.frame = frame
         self.valid = valid
+
+class Reference_Sequence:
+    def __init__(self, virtual, byteValue, frame, entireFrame):
+        self.virtual = virtual
+        self.byteValue = byteValue
+        self.frame = frame
+        self.entireFrame = entireFrame
+
 
 # def processFile(filename):
 #     try:

@@ -11,14 +11,15 @@ PAGE_SIZE = 256
 TLB_SIZE = 16
 TLB = []
 PageTable = []
-backingStore = []
+# backingStore = []
 
 def main(argv):
     FRAMES = 256
     PRA = "FIFO"
 
-    backingStore = readBackingStoreFile("BACKING_STORE.bin")
+    # backingStore = readBackingStoreFile("BACKING_STORE.bin")
     vAddresses = getVirtualAddresses(argv[0])
+    print(vAddresses)
     
     for i in range(1, len(argv)):
         if argv[i].isnumeric():
@@ -33,17 +34,26 @@ def main(argv):
     else:
         LRU(vAddresses, FRAMES)
         
-def readBackingStoreFile(filename):
-    b_store = []
-    file = open(filename,"rb")
-    byte = file.read(256).hex()
-    while byte:
-        b_store.append(byte) 
-        print(byte)
-        byte = file.read(256).hex()
-    file.close()
-    return b_store
+# def readBackingStoreFile(filename):
+#     b_store = []
+#     file = open(filename,"rb")
+#     bytes = file.read(256).hex()
+#     while bytes:
+#         b_store.append(bytes) 
+#         print(bytes)
+#         bytes = file.read(256).hex()
+#     file.close()
+#     return b_store
 
+# Given a byte offset and number of bytes to read,
+# opens Backing Store, moves file descriptor to offset
+# and reads the number of bytes from the offset
+def accessBackingStore(offset, num_of_bytes):
+    file = open("BACKING_STORE.bin","rb")
+    file.seek(offset, 0)
+    bytes_read = file.read(num_of_bytes)
+    file.close()
+    return bytes_read
 
 # Gets virtual addresses from user specified text file
 def getVirtualAddresses(filename):
@@ -75,14 +85,6 @@ class PageTable_Entry:
         self.frame = frame
         self.valid = valid
 
-# def processFile(filename):
-#     try:
-#         colnames = ["StLastName", "StFirstName", "Grade", "Classroom", "Bus", "GPA", "TLastName", "TFirstName"]
-#         dataset = pd.read_csv(filename, names=colnames, header=None)
-#         return dataset
-#     except IOError:
-#         print('Error: students.txt could not be found in current directory.\nExiting program :)')
-#         sys.exit()
-
 if __name__ == "__main__":
     main(sys.argv[1:])
+    # main(sys.argv)

@@ -2,23 +2,110 @@ from audioop import add
 from cgi import print_arguments
 import sys
 
-
-# backing_store.seek(p * PAGE_SIZE + d, 0)
-# ref_byte = backing_store.read(1)
-# ref_byte_int = int.from_bytes(ref_byte, 'little', signed=True)
-# https://www.geeksforgeeks.org/python-seek-function/ 
-
-
 PAGE_SIZE = 256
 TLB_SIZE = 16
-Tlb = [None] * TLB_SIZE
-PageTable = []
 
-# The full address (from the reference file)
-# The value of the byte referenced (1 signed integer)
-# The physical memory frame number (one positive integer)
-# The content of the entire frame (256 bytes in hex ASCII characters, no spaces in between)
-# new line character
+class StatTracker:
+    def __init__(self):
+        self.num_trans_addrs = 0
+        self.page_faults = 0
+        self.page_attempts = 0
+        self.tlb_hits = 0
+        self.tlb_misses = 0
+        
+    def getTLBHitRate():
+        return 3
+    
+    def getTLBHits(self):
+        return self.tlb_hits
+    
+    def incTLBHits(self):
+        self.tlb_hits += 1
+        
+    def getTLBMisses(self):
+        return self.tlb_misses
+    
+    def incTLBMisses(self):
+        self.tlb_misses += 1
+        
+    def getPageFaults(self):
+        return self.page_faults
+    
+    def incPageFaults(self):
+        self.page_faults += 1
+    
+    def getNumTransAddresses(self):
+        return self.num_trans_addrs
+    
+    def incNumTransAddresses(self):
+        self.num_trans_addrs += 1
+        
+    # def printSummary():
+    #     print(F"{address}, {rbyteInteger},")
+    #     print(F"Number of Translated Addresses = 10")
+    #     print(F"Page Faults = 10")
+    #     print(F"Page Fault Rate = 1.000")
+    #     print(F"TLB Hits = 0")
+    #     print(F"TLB Misses = 10")
+    #     print(F"TLB Hit Rate = {getTLBHitRate()}")
+
+
+class PhysicalMemory:
+    def __init__(self, nf):
+        self.memory = [None] * nf
+        self.num_frames = nf
+        self.length = 0
+    
+    def setFrame(self, frame_num, data):
+        self.memory[frame_num] = data
+    
+    def getNumFrames(self):
+        return self.num_frames
+        
+    def isFull(self):
+        return None not in self.memory
+            
+    def getLength(self):
+        return self.length
+    
+    def setLength(self, num):
+        self.length = num
+        
+    # def getAvailableFrameNum(self):
+    #     return self.length
+
+             
+class TLB:
+    def __init__(self):
+        self.tlb = {}
+
+    def addEntry(self, page, frame):
+        if len(self.tlb.keys()) == TLB_SIZE:
+            self.tlb.pop(list(d.keys()).pop(0))
+        self.tlb.update({page : frame})  
+            
+    def is_empty(self):
+        return len(self.tlb.keys()) == 0
+    
+    def findPage(self, page):
+        return page in self.tlb.keys()
+    
+    def getFrame(self, page):
+        return self.tlb[page]
+
+class PageTable:
+    def __init__(self):
+        self.pt = {}
+
+    def updateEntry(self, page, frame, v_bit):
+        self.pt.update({tuple((page, frame)): v_bit})      
+    
+    def findEntry(self, page, frame):
+        return (page, frame) in self.pt.keys()
+    
+    def getValidBit(self, page, frame):
+        return self.pt.get(tuple((page, frame)))     
+      
 def printHeader(address):
     page_num = address // PAGE_SIZE
     offset = address % PAGE_SIZE
@@ -26,71 +113,6 @@ def printHeader(address):
     rbyteInteger = int.from_bytes(referenced_byte, 'little', signed=True)
     print(F"{address}, {rbyteInteger},")
     
-class TLB:
-    def __init__(self):
-        self.tlb = []
-
-    # We can get rid of TLB and keep python tuples?? This way allows us to keep them
-    def add_entry(self, page, frame):
-        self.tlb.append(tuple((page, frame)))
-        if len(self.tlb) == 17:
-            self.tlb.pop(0)
-    
-    def findEntry(self, page, frame):
-        return (page, frame) in self.tlb
-            
-# class TLB_Entry:
-#     def __init__(self, page, frame):
-#         self.page = page
-#         self.frame = frame
-
-class PageTable_Entry:
-    def __init__(self, page, frame, valid):
-        self.page = page
-        self.frame = frame
-        self.valid = valid
-
-def comp_tlb_entries(tlb_e1, tlb_e2):
-    return tlb_e1.page ==  tlb_e1.page and tlb_e1.frame == tlb_e1.frame
-
-def main(argv):
-    tlb = TLB() 
-    FRAMES = 256
-    PRA = "FIFO"
-    vAddresses = getVirtualAddresses(argv[0])
-    
-    for i in range(1, len(argv)):
-        if argv[i].isnumeric():
-            FRAMES = int(argv[i])
-        elif argv[i] == "LRU" or argv == "OPT":
-            PRA = argv[i]
-            
-    if PRA == "FIFO":
-        FIFO(vAddresses, FRAMES, tlb)
-    elif PRA == "OPT":
-        OPT(vAddresses, FRAMES, tlb)
-    else:
-        LRU(vAddresses, FRAMES, tlb)
-        
-def LRU(vAddresses, num_frames):
-    for vAddress in vAddresses:
-        LRU_Helper(vAddress, num_frames)
-        printHeader(vAddress)
-        
-        # print(accessBackingStore(PAGE_SIZE * i, 1)) when you find the frame, spit out contents
-
-    # print(accessBackingStore(0, 256))
-
-
-# Total number of page faults and a % page fault rate
-# Total number of TLB hits, misses and % TLB hit rate
-def LRU_Helper(vAddress, num_frames):
-    # TLB 
-    # PageTable
-    return 3
-    
-    
-
 # Given a byte offset and number of bytes to read,
 # opens Backing Store, moves file descriptor to offset
 # and reads the number of bytes from the offset
@@ -110,12 +132,75 @@ def getVirtualAddresses(filename):
         vAddresses.append(int(line))
     file.close()
     return vAddresses
+  
+  
+# Ask Tessa if a Cache Miss is if the Page and the Frame don't match up.
+# def getAvailableIndex(mem, lru_tracker):
+#     if(mem.isFull()):
+        
+#     else:
+#         mem.getLength()
+        
+    
+    
+    # lru_index = lru_tracker.pop()
+    # lru_tracker.insert(0,lru_index)
+#     return lru_index
 
-def FIFO(vAddresses, frames):
-    return
+def LRU(vAddresses, tlb, pt, mem, stats):
+    # mem = [None] * num_frames
+    lru_tracker = [range(0,mem.getNumFrames())]
+    
+    for vAddress in vAddresses:
+        # open_index = getAvailableIndex(mem, lru_tracker)
+        processAddressLRU(vAddress, tlb, pt, mem, lru_tracker)
+        printHeader(vAddress)
+        
+        # print(accessBackingStore(PAGE_SIZE * i, 1)) when you find the frame, spit out contents
 
-def OPT(vAddresses, frames):
-    return
+def updateLRUTracker(lru_tracker, tlb):
+    lru_frame = lru_tracker.remove(tlb.getFrame())
+    lru_tracker.insert(0,lru_frame)
+
+def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
+    page = vAddress // PAGE_SIZE
+    offset = vAddress % PAGE_SIZE
+    
+    if(tlb.findPage(page)):
+        updateLRUTracker(lru_tracker, tlb)
+        stats.incTLBHits()
+        return   
+    elif(tlb.findEntry()):
+        return
+    
+# def FIFO(vAddresses, frames):
+#     return
+
+# def OPT(vAddresses, frames):
+#     return
+
+def main(argv):
+    FRAMES = 256
+    PRA = "FIFO"
+    stats = StatTracker()
+    tlb = TLB() 
+    page_table = PageTable()
+    vAddresses = getVirtualAddresses(argv[0])
+        
+    for i in range(1, len(argv)):
+        if argv[i].isnumeric():
+            FRAMES = int(argv[i])
+        elif argv[i] == "LRU" or argv == "OPT":
+            PRA = argv[i]
+            
+    mem = PhysicalMemory(FRAMES)
+            
+    if PRA == "FIFO":
+        FIFO(vAddresses, tlb, page_table, mem, stats)
+    elif PRA == "OPT":
+        OPT(vAddresses, tlb, page_table, mem, stats)
+    else:
+        LRU(vAddresses, tlb, page_table, mem, stats)
 
 if __name__ == "__main__":
     main(sys.argv[1:])    

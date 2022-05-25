@@ -8,47 +8,33 @@ TLB_SIZE = 16
 class StatTracker:
     def __init__(self):
         self.num_trans_addrs = 0
-        self.page_faults = 0
-        self.page_attempts = 0
+        self.page_hits = 0
+        self.page_accesses = 0
         self.tlb_hits = 0
-        self.tlb_misses = 0
+        self.tlb_accesses = 0
         
-    def getTLBHitRate():
-        return 3
-    
-    def getTLBHits(self):
-        return self.tlb_hits
-    
     def incTLBHits(self):
         self.tlb_hits += 1
         
-    def getTLBMisses(self):
-        return self.tlb_misses
-    
-    def incTLBMisses(self):
-        self.tlb_misses += 1
+    def incTLBAccesses(self):
+        self.tlb_accesses += 1
         
-    def getPageFaults(self):
-        return self.page_faults
-    
-    def incPageFaults(self):
-        self.page_faults += 1
-    
-    def getNumTransAddresses(self):
-        return self.num_trans_addrs
-    
+    def incPageHits(self):
+        self.page_hits += 1
+        
+    def incPageAccesses(self):
+        self.page_accesses += 1
+        
     def incNumTransAddresses(self):
         self.num_trans_addrs += 1
         
-    # def printSummary():
-    #     print(F"{address}, {rbyteInteger},")
-    #     print(F"Number of Translated Addresses = 10")
-    #     print(F"Page Faults = 10")
-    #     print(F"Page Fault Rate = 1.000")
-    #     print(F"TLB Hits = 0")
-    #     print(F"TLB Misses = 10")
-    #     print(F"TLB Hit Rate = {getTLBHitRate()}")
-
+    def printSummary(self):
+        print(F"Number of Translated Addresses = {self.num_trans_addrs}")
+        print(F"Page Faults = {self.page_accesses - self.page_hits}")
+        print(F"Page Fault Rate = {(self.page_accesses - self.page_hits) / self.page_accesses}")
+        print(F"TLB Hits = {self.tlb_hits}")
+        print(F"TLB Misses = {self.tlb_accesses - self.tlb_hits}")
+        print(F"TLB Hit Rate = {self.page_hits / self.tlb_accesses}")
 
 class PhysicalMemory:
     def __init__(self, nf):
@@ -71,9 +57,8 @@ class PhysicalMemory:
     def setLength(self, num):
         self.length = num
         
-    # def getAvailableFrameNum(self):
-    #     return self.length
-
+    def getMemory(self):
+        return self.memory
              
 class TLB:
     def __init__(self):
@@ -92,26 +77,47 @@ class TLB:
     
     def getFrame(self, page):
         return self.tlb[page]
+    
+    def remEntry(self, page):
+        self.tlb.pop(page)
 
 class PageTable:
     def __init__(self):
         self.pt = {}
 
     def updateEntry(self, page, frame, v_bit):
-        self.pt.update({tuple((page, frame)): v_bit})      
+        self.pt.update({tuple((page , frame)) :  v_bit})      
     
-    def findEntry(self, page, frame):
-        return (page, frame) in self.pt.keys()
+    def findEntry(self, page):
+        for entry in self.pt.items():
+            if entry[0][0] == page and entry[1] == 1:
+                return True
+        return False
     
     def getValidBit(self, page, frame):
-        return self.pt.get(tuple((page, frame)))     
+        return self.pt.get(page, frame)     
+    
+    def setValidBit(self, page, frame, bit):
+        self.pt.update({tuple((page, frame)): bit})    
+        
+    def getFrame(self, page):
+        for entry in self.pt.items():
+            if entry[0][0] == page and entry[1] == 1:
+                return entry[0][1]
+            
+    def getPage(self, frame):
+        for entry in self.pt.items():
+            if entry[0][1] == frame and entry[1] == 1:
+                return entry[0][0]
+         
       
-def printHeader(address):
+def printHeader(address, frame, mem):
     page_num = address // PAGE_SIZE
     offset = address % PAGE_SIZE
     referenced_byte = accessBackingStore(PAGE_SIZE * page_num + offset, 1)
     rbyteInteger = int.from_bytes(referenced_byte, 'little', signed=True)
-    print(F"{address}, {rbyteInteger},")
+    print(F"{address}, {rbyteInteger}, {frame},")
+    print(mem.getMemory()[frame].hex().upper())
     
 # Given a byte offset and number of bytes to read,
 # opens Backing Store, moves file descriptor to offset
@@ -132,52 +138,60 @@ def getVirtualAddresses(filename):
         vAddresses.append(int(line))
     file.close()
     return vAddresses
-  
-  
-# Ask Tessa if a Cache Miss is if the Page and the Frame don't match up.
-# def getAvailableIndex(mem, lru_tracker):
-#     if(mem.isFull()):
-        
-#     else:
-#         mem.getLength()
-        
-    
-    
-    # lru_index = lru_tracker.pop()
-    # lru_tracker.insert(0,lru_index)
-#     return lru_index
+
 
 def LRU(vAddresses, tlb, pt, mem, stats):
-    # mem = [None] * num_frames
-    lru_tracker = [range(0,mem.getNumFrames())]
-    
+    lru_tracker = list(range(0,mem.getNumFrames()))
     for vAddress in vAddresses:
-        # open_index = getAvailableIndex(mem, lru_tracker)
-        processAddressLRU(vAddress, tlb, pt, mem, lru_tracker)
-        printHeader(vAddress)
+        frame = processAddressLRU(vAddress, tlb, pt, mem, lru_tracker, stats)
+        printHeader(vAddress, frame, mem)
+    stats.printSummary()
         
-        # print(accessBackingStore(PAGE_SIZE * i, 1)) when you find the frame, spit out contents
-
-def updateLRUTracker(lru_tracker, tlb):
-    lru_frame = lru_tracker.remove(tlb.getFrame())
+def updateLRUTracker(lru_tracker, tlb, page):
+    lru_frame = lru_tracker.remove(tlb.getFrame(page))
     lru_tracker.insert(0,lru_frame)
 
 def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
     page = vAddress // PAGE_SIZE
-    offset = vAddress % PAGE_SIZE
+    stats.incTLBAccesses()
     
     if(tlb.findPage(page)):
-        updateLRUTracker(lru_tracker, tlb)
+        updateLRUTracker(lru_tracker, tlb, page)
         stats.incTLBHits()
-        return   
-    elif(tlb.findEntry()):
-        return
+        return  tlb.getFrame(page)
     
-# def FIFO(vAddresses, frames):
-#     return
+    stats.incPageAccesses()
+    
+    if(pt.findEntry(page)):
+        updateLRUTracker(lru_tracker, tlb, page)
+        stats.incPageHits()
+        tlb.addEntry(page, pt.getFrame(page))
+        return pt.getFrame(page)
 
-# def OPT(vAddresses, frames):
-#     return
+    upd_frame = mem.getLength()
+    
+    if(mem.isFull()):
+        upd_frame = lru_tracker.pop()
+        lru_tracker.insert(0, upd_frame)
+        remPage = pt.getPage(upd_frame)
+        pt.updateEntry(remPage, upd_frame, 0) 
+        tlb.remEntry(remPage)
+    
+    tlb.addEntry(page, upd_frame)
+    pt.updateEntry(page, upd_frame, 1)
+    mem.setFrame(upd_frame, accessBackingStore(PAGE_SIZE * page, 256))
+    mem.setLength(mem.getLength() + 1)
+    stats.incNumTransAddresses()
+    
+    return upd_frame
+
+        
+def FIFO(vAddresses, tlb, pt, mem, stats):
+    return
+
+
+def OPT(vAddresses, tlb, pt, mem, stats):
+    return
 
 def main(argv):
     FRAMES = 256
@@ -204,14 +218,3 @@ def main(argv):
 
 if __name__ == "__main__":
     main(sys.argv[1:])    
-        
-# def readBackingStoreFile(filename):
-#     b_store = []
-#     file = open(filename,"rb")
-#     bytes = file.read(256).hex()
-#     while bytes:
-#         b_store.append(bytes) 
-#         print(bytes)
-#         bytes = file.read(256).hex()
-#     file.close()
-#     return b_store

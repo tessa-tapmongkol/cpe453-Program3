@@ -2,7 +2,7 @@ from audioop import add
 from cgi import print_arguments
 import sys
 
-PAGE_SIZE = 2
+PAGE_SIZE = 256
 TLB_SIZE = 16
 
 class StatTracker:

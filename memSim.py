@@ -25,9 +25,6 @@ class StatTracker:
     def incPageAccesses(self):
         self.page_accesses += 1
         
-    def incNumTransAddresses(self):
-        self.num_trans_addrs += 1
-        
     def printSummary(self):
         print(F"Number of Translated Addresses = {self.num_trans_addrs}")
         print(F"Page Faults = {self.page_accesses - self.page_hits}")
@@ -66,7 +63,7 @@ class TLB:
 
     def addEntry(self, page, frame):
         if len(self.tlb.keys()) == TLB_SIZE:
-            self.tlb.pop(list(d.keys()).pop(0))
+            self.tlb.pop(list(self.tlb.keys()).pop(0), None)
         self.tlb.update({page : frame})  
             
     def is_empty(self):
@@ -79,7 +76,7 @@ class TLB:
         return self.tlb[page]
     
     def remEntry(self, page):
-        self.tlb.pop(page)
+        self.tlb.pop(page, None)
 
 class PageTable:
     def __init__(self):
@@ -109,7 +106,12 @@ class PageTable:
         for entry in self.pt.items():
             if entry[0][1] == frame and entry[1] == 1:
                 return entry[0][0]
-         
+    
+    def pop(self):
+        return self.pt.popitem()
+    
+    def isFull(self):
+        return len(self.pt) >= PAGE_SIZE
       
 def printHeader(address, frame, mem):
     page_num = address // PAGE_SIZE
@@ -145,6 +147,7 @@ def LRU(vAddresses, tlb, pt, mem, stats):
     for vAddress in vAddresses:
         frame = processAddressLRU(vAddress, tlb, pt, mem, lru_tracker, stats)
         printHeader(vAddress, frame, mem)
+    stats.num_trans_addrs = len(vAddresses)
     stats.printSummary()
         
 def updateLRUTracker(lru_tracker, tlb, page):
@@ -176,19 +179,65 @@ def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
         remPage = pt.getPage(upd_frame)
         pt.updateEntry(remPage, upd_frame, 0) 
         tlb.remEntry(remPage)
-    
+
     tlb.addEntry(page, upd_frame)
     pt.updateEntry(page, upd_frame, 1)
     mem.setFrame(upd_frame, accessBackingStore(PAGE_SIZE * page, 256))
     mem.setLength(mem.getLength() + 1)
-    stats.incNumTransAddresses()
     
     return upd_frame
 
         
 def FIFO(vAddresses, tlb, pt, mem, stats):
-    return
+    fifo_tracker = list(range(0, mem.getNumFrames()))
+    for vAddress in vAddresses:
+        frame = processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker)
+        printHeader(vAddress, frame, mem)
+    stats.num_trans_addrs = len(vAddresses)
+    stats.printSummary()
 
+def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker):
+    # Calculate page number
+    page = vAddress // PAGE_SIZE
+
+    # Access TLB
+    stats.incTLBAccesses()
+    if(tlb.findPage(page)):
+        # Hit on TLB
+        stats.incTLBHits()
+        return tlb.getFrame(page)
+    
+    # Miss on TLB, go to page table
+    stats.incPageAccesses()
+    if(pt.findEntry(page)):
+        # Hit on page table, add entry to TLB
+        stats.incPageHits()
+        tlb.addEntry(page, pt.getFrame(page))
+        return pt.getFrame(page)
+
+    # Fault on page table, go to backing store
+    upd_frame = mem.getLength()
+    if(mem.isFull()):
+        # Memory is full, use PRA
+        upd_frame = fifo_tracker.pop(0)
+        fifo_tracker.append(upd_frame)
+        remPage = pt.getPage(upd_frame)
+        pt.updateEntry(remPage, upd_frame, 0) 
+        tlb.remEntry(remPage)
+
+    if pt.isFull():
+        # Page table is full, use PRA
+        pt_entry = pt.pop()
+        if pt_entry[1] == 1:
+            tlb.remEntry(pt_entry[0][0])
+
+    # Add new page and frame number to TLB, page table, and memory from backing store
+    tlb.addEntry(page, upd_frame)
+    pt.updateEntry(page, upd_frame, 1)
+    mem.setFrame(upd_frame, accessBackingStore(PAGE_SIZE * page, 256))
+    mem.setLength(mem.getLength() + 1)
+    
+    return upd_frame
 
 def OPT(vAddresses, tlb, pt, mem, stats):
     return

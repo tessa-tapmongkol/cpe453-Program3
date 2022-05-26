@@ -24,14 +24,24 @@ class StatTracker:
         
     def incPageAccesses(self):
         self.page_accesses += 1
+    
+    def pageFaultRate(self): 
+        if (self.page_accesses != 0):
+            return (self.page_accesses - self.page_hits) / self.page_accesses
+        return 0
+    
+    def tlbHitRate(self):
+        if self.tlb_accesses != 0:
+            return self.page_hits / self.tlb_accesses
+        return 0
         
     def printSummary(self):
         print(F"Number of Translated Addresses = {self.num_trans_addrs}")
         print(F"Page Faults = {self.page_accesses - self.page_hits}")
-        print(F"Page Fault Rate = {(self.page_accesses - self.page_hits) / self.page_accesses}")
+        print(F"Page Fault Rate = {self.pageFaultRate()}")
         print(F"TLB Hits = {self.tlb_hits}")
         print(F"TLB Misses = {self.tlb_accesses - self.tlb_hits}")
-        print(F"TLB Hit Rate = {self.page_hits / self.tlb_accesses}")
+        print(F"TLB Hit Rate = {self.tlbHitRate()}")
 
 class PhysicalMemory:
     def __init__(self, nf):
@@ -76,6 +86,7 @@ class TLB:
         return self.tlb[page]
     
     def remEntry(self, page):
+        print("Page Evicted: ", page)
         self.tlb.pop(page, None)
 
 class PageTable:
@@ -132,7 +143,7 @@ def getVirtualAddresses(filename):
 
 
 def LRU(vAddresses, tlb, pt, mem, stats):
-    lru_tracker = list(range(0,mem.getNumFrames()))
+    lru_tracker = list(reversed(range(0, mem.getNumFrames())))
     for vAddress in vAddresses:
         frame = processAddressLRU(vAddress, tlb, pt, mem, lru_tracker, stats)
         printHeader(vAddress, frame, mem)
@@ -140,8 +151,9 @@ def LRU(vAddresses, tlb, pt, mem, stats):
     stats.printSummary()
         
 def updateLRUTracker(lru_tracker, tlb, page):
-    lru_frame = lru_tracker.remove(tlb.getFrame(page))
-    lru_tracker.insert(0,lru_frame)
+    lru_frame = tlb.getFrame(page)
+    lru_tracker.remove(tlb.getFrame(page))
+    lru_tracker.insert(0, lru_frame)
 
 def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
     page = vAddress // PAGE_SIZE

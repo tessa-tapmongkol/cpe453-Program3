@@ -25,9 +25,6 @@ class StatTracker:
     def incPageAccesses(self):
         self.page_accesses += 1
         
-    def incNumTransAddresses(self):
-        self.num_trans_addrs += 1
-        
     def printSummary(self):
         print(F"Number of Translated Addresses = {self.num_trans_addrs}")
         print(F"Page Faults = {self.page_accesses - self.page_hits}")
@@ -150,6 +147,7 @@ def LRU(vAddresses, tlb, pt, mem, stats):
     for vAddress in vAddresses:
         frame = processAddressLRU(vAddress, tlb, pt, mem, lru_tracker, stats)
         printHeader(vAddress, frame, mem)
+    stats.num_trans_addrs = len(vAddresses)
     stats.printSummary()
         
 def updateLRUTracker(lru_tracker, tlb, page):
@@ -186,7 +184,6 @@ def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
     pt.updateEntry(page, upd_frame, 1)
     mem.setFrame(upd_frame, accessBackingStore(PAGE_SIZE * page, 256))
     mem.setLength(mem.getLength() + 1)
-    stats.incNumTransAddresses()
     
     return upd_frame
 
@@ -227,7 +224,7 @@ def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker):
         remPage = pt.getPage(upd_frame)
         pt.updateEntry(remPage, upd_frame, 0) 
         tlb.remEntry(remPage)
-        
+
     if pt.isFull():
         # Page table is full, use PRA
         pt_entry = pt.pop()

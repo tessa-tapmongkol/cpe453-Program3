@@ -227,6 +227,7 @@ def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker):
         remPage = pt.getPage(upd_frame)
         pt.updateEntry(remPage, upd_frame, 0) 
         tlb.remEntry(remPage)
+        
     if pt.isFull():
         # Page table is full, use PRA
         pt_entry = pt.pop()

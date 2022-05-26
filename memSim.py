@@ -83,35 +83,24 @@ class PageTable:
         self.pt = {}
 
     def updateEntry(self, page, frame, v_bit):
-        self.pt.update({tuple((page , frame)) :  v_bit})      
+        self.pt.update({page : tuple((frame, v_bit))})      
     
     def findEntry(self, page):
-        for entry in self.pt.items():
-            if entry[0][0] == page and entry[1] == 1:
-                return True
-        return False
+        return page in self.pt.keys() and self.pt.get(page)[1]
     
     def getValidBit(self, page, frame):
-        return self.pt.get(page, frame)     
+        return self.pt.get(page)[1]     
     
     def setValidBit(self, page, frame, bit):
-        self.pt.update({tuple((page, frame)): bit})    
+        self.pt.update({page : tuple(( frame, bit ))})    
         
     def getFrame(self, page):
-        for entry in self.pt.items():
-            if entry[0][0] == page and entry[1] == 1:
-                return entry[0][1]
+        return self.pt.get(page)[0] 
             
     def getPage(self, frame):
         for entry in self.pt.items():
-            if entry[0][1] == frame and entry[1] == 1:
-                return entry[0][0]
-    
-    def pop(self):
-        return self.pt.popitem()
-    
-    def isFull(self):
-        return len(self.pt) >= PAGE_SIZE
+            if entry[1][0] == frame and entry[1][1] == 1:
+                return entry[0]
       
 def printHeader(address, frame, mem):
     page_num = address // PAGE_SIZE
@@ -224,12 +213,6 @@ def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker):
         remPage = pt.getPage(upd_frame)
         pt.updateEntry(remPage, upd_frame, 0) 
         tlb.remEntry(remPage)
-
-    if pt.isFull():
-        # Page table is full, use PRA
-        pt_entry = pt.pop()
-        if pt_entry[1] == 1:
-            tlb.remEntry(pt_entry[0][0])
 
     # Add new page and frame number to TLB, page table, and memory from backing store
     tlb.addEntry(page, upd_frame)

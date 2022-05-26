@@ -2,7 +2,7 @@ from audioop import add
 from cgi import print_arguments
 import sys
 
-PAGE_SIZE = 256
+PAGE_SIZE = 2
 TLB_SIZE = 16
 
 class StatTracker:
@@ -79,7 +79,7 @@ class TLB:
         return self.tlb[page]
     
     def remEntry(self, page):
-        self.tlb.pop(page)
+        self.tlb.pop(page, None)
 
 class PageTable:
     def __init__(self):
@@ -111,7 +111,7 @@ class PageTable:
                 return entry[0][0]
     
     def pop(self):
-        return self.pt.popitem() 
+        return self.pt.popitem()
     
     def isFull(self):
         return len(self.pt) >= PAGE_SIZE
@@ -181,11 +181,6 @@ def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
         remPage = pt.getPage(upd_frame)
         pt.updateEntry(remPage, upd_frame, 0) 
         tlb.remEntry(remPage)
-    
-    if pt.isFull():
-        pt_entry = pt.pop()
-        if pt_entry[1] == 1:
-            tlb.remEntry(pt_entry[0][0])
 
     tlb.addEntry(page, upd_frame)
     pt.updateEntry(page, upd_frame, 1)
@@ -226,6 +221,11 @@ def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker):
         remPage = pt.getPage(upd_frame)
         pt.updateEntry(remPage, upd_frame, 0) 
         tlb.remEntry(remPage)
+
+    if pt.isFull():
+        pt_entry = pt.pop()
+        if pt_entry[1] == 1:
+            tlb.remEntry(pt_entry[0][0])
 
     tlb.addEntry(page, upd_frame)
     pt.updateEntry(page, upd_frame, 1)

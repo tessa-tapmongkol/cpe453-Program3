@@ -109,7 +109,12 @@ class PageTable:
         for entry in self.pt.items():
             if entry[0][1] == frame and entry[1] == 1:
                 return entry[0][0]
-         
+    
+    def pop(self):
+        return self.pt.popitem() 
+    
+    def isFull(self):
+        return len(self.pt) >= PAGE_SIZE
       
 def printHeader(address, frame, mem):
     page_num = address // PAGE_SIZE
@@ -177,6 +182,11 @@ def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
         pt.updateEntry(remPage, upd_frame, 0) 
         tlb.remEntry(remPage)
     
+    if pt.isFull():
+        pt_entry = pt.pop()
+        if pt_entry[1] == 1:
+            tlb.remEntry(pt_entry[0][0])
+
     tlb.addEntry(page, upd_frame)
     pt.updateEntry(page, upd_frame, 1)
     mem.setFrame(upd_frame, accessBackingStore(PAGE_SIZE * page, 256))
@@ -187,8 +197,44 @@ def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
 
         
 def FIFO(vAddresses, tlb, pt, mem, stats):
-    return
+    fifo_tracker = list(range(0, mem.getNumFrames()))
+    page_tracker = list(range(0, PAGE_SIZE))
+    for vAddress in vAddresses:
+        frame = processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker, page_tracker)
+        printHeader(vAddress, frame, mem)
+    stats.printSummary()
 
+def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker, page_tracker):
+    page = vAddress // PAGE_SIZE
+    stats.incTLBAccesses()
+    
+    if(tlb.findPage(page)):
+        stats.incTLBHits()
+        return  tlb.getFrame(page)
+    
+    stats.incPageAccesses()
+    
+    if(pt.findEntry(page)):
+        stats.incPageHits()
+        tlb.addEntry(page, pt.getFrame(page))
+        return pt.getFrame(page)
+
+    upd_frame = mem.getLength()
+
+    if(mem.isFull()):
+        upd_frame = fifo_tracker.pop(0)
+        fifo_tracker.append(upd_frame)
+        remPage = pt.getPage(upd_frame)
+        pt.updateEntry(remPage, upd_frame, 0) 
+        tlb.remEntry(remPage)
+
+    tlb.addEntry(page, upd_frame)
+    pt.updateEntry(page, upd_frame, 1)
+    mem.setFrame(upd_frame, accessBackingStore(PAGE_SIZE * page, 256))
+    mem.setLength(mem.getLength() + 1)
+    stats.incNumTransAddresses()
+    
+    return upd_frame
 
 def OPT(vAddresses, tlb, pt, mem, stats):
     return

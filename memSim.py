@@ -198,13 +198,12 @@ def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
         
 def FIFO(vAddresses, tlb, pt, mem, stats):
     fifo_tracker = list(range(0, mem.getNumFrames()))
-    page_tracker = list(range(0, PAGE_SIZE))
     for vAddress in vAddresses:
-        frame = processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker, page_tracker)
+        frame = processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker)
         printHeader(vAddress, frame, mem)
     stats.printSummary()
 
-def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker, page_tracker):
+def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker):
     page = vAddress // PAGE_SIZE
     stats.incTLBAccesses()
     

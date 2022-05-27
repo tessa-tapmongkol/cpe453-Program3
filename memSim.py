@@ -235,6 +235,16 @@ def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker):
     return upd_frame
 
 def OPT(vAddresses, tlb, pt, mem, stats):
+    # fifo_tracker = list(range(0, mem.getNumFrames()))
+    page_tracker = list(map(lambda vAddress: vAddress // PAGE_SIZE, vAddresses))
+    print(page_tracker)
+    # for vAddress in vAddresses:
+    #     frame = processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker)
+    #     printHeader(vAddress, frame, mem)
+    # stats.num_trans_addrs = len(vAddresses)
+    # stats.printSummary()
+
+def processAddressOPT(vAddress, tlb, pt, mem, stats, fifo_tracker):
     return
 
 def main(argv):
@@ -256,6 +266,7 @@ def main(argv):
     if PRA == "FIFO":
         FIFO(vAddresses, tlb, page_table, mem, stats)
     elif PRA == "OPT":
+        print("DOing OPT!!")
         OPT(vAddresses, tlb, page_table, mem, stats)
     else:
         LRU(vAddresses, tlb, page_table, mem, stats)

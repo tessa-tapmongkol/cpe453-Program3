@@ -86,7 +86,6 @@ class TLB:
         return self.tlb[page]
     
     def remEntry(self, page):
-        print("Page Evicted: ", page)
         self.tlb.pop(page, None)
 
 class PageTable:
@@ -244,7 +243,6 @@ def OPT(vAddresses, tlb, pt, mem, stats):
 
 def processAddressOPT(vAddress, tlb, pt, mem, stats, future_tracker, past_tracker):
     page = vAddress // PAGE_SIZE
-    
     # Access TLB
     stats.incTLBAccesses()
     if(tlb.findPage(page)):
@@ -279,7 +277,8 @@ def processAddressOPT(vAddress, tlb, pt, mem, stats, future_tracker, past_tracke
     return upd_frame
 
 def getNewFrameOPT(pt, future_tracker, past_tracker):
-    furthest = 0
+    furthest = 1
+    pop_past = 0
     for index, entry in enumerate(past_tracker):
         if entry not in future_tracker:
             past_tracker.pop(index)
@@ -288,6 +287,8 @@ def getNewFrameOPT(pt, future_tracker, past_tracker):
             i = future_tracker.index(entry)
             if i > furthest:
                 furthest = i
+                pop_past = index
+    past_tracker.pop(pop_past)
     return pt.getFrame(future_tracker[furthest])
 
 

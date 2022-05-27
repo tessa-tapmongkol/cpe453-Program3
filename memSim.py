@@ -248,6 +248,7 @@ def processAddressOPT(vAddress, tlb, pt, mem, stats, fifo_tracker):
     return
 
 def main(argv):
+    print("Helloo")
     FRAMES = 256
     PRA = "FIFO"
     stats = StatTracker()

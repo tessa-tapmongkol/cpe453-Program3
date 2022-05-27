@@ -188,7 +188,6 @@ def processAddressLRU(vAddress,  tlb, pt, mem, lru_tracker, stats):
     
     return upd_frame
 
-        
 def FIFO(vAddresses, tlb, pt, mem, stats):
     fifo_tracker = list(range(0, mem.getNumFrames()))
     for vAddress in vAddresses:
@@ -235,20 +234,64 @@ def processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker):
     return upd_frame
 
 def OPT(vAddresses, tlb, pt, mem, stats):
-    # fifo_tracker = list(range(0, mem.getNumFrames()))
-    page_tracker = list(map(lambda vAddress: vAddress // PAGE_SIZE, vAddresses))
-    print(page_tracker)
-    # for vAddress in vAddresses:
-    #     frame = processAddressFIFO(vAddress, tlb, pt, mem, stats, fifo_tracker)
-    #     printHeader(vAddress, frame, mem)
-    # stats.num_trans_addrs = len(vAddresses)
-    # stats.printSummary()
+    future_tracker = list(map(lambda vAddress: vAddress // PAGE_SIZE, vAddresses))
+    past_tracker = []
+    for vAddress in vAddresses:
+        frame = processAddressOPT(vAddress, tlb, pt, mem, stats, future_tracker, past_tracker)
+        printHeader(vAddress, frame, mem)
+    stats.num_trans_addrs = len(vAddresses)
+    stats.printSummary()
 
-def processAddressOPT(vAddress, tlb, pt, mem, stats, fifo_tracker):
-    return
+def processAddressOPT(vAddress, tlb, pt, mem, stats, future_tracker, past_tracker):
+    page = vAddress // PAGE_SIZE
+    
+    # Access TLB
+    stats.incTLBAccesses()
+    if(tlb.findPage(page)):
+        # Hit on TLB
+        stats.incTLBHits()
+        return tlb.getFrame(page)
+    
+    # Miss on TLB, go to page table
+    stats.incPageAccesses()
+    if(pt.findEntry(page)):
+        # Hit on page table, add entry to TLB
+        stats.incPageHits()
+        tlb.addEntry(page, pt.getFrame(page))
+        return pt.getFrame(page)
+
+     # Fault on page table, go to backing store
+    upd_frame = mem.getLength()
+    if(mem.isFull()):
+        # Memory is full, use PRA
+        upd_frame = getNewFrameOPT(pt, future_tracker, past_tracker)
+        remPage = pt.getPage(upd_frame)
+        pt.updateEntry(remPage, upd_frame, 0) 
+        tlb.remEntry(remPage)
+
+    # Add new page and frame number to TLB, page table, and memory from backing store
+    tlb.addEntry(page, upd_frame)
+    pt.updateEntry(page, upd_frame, 1)
+    mem.setFrame(upd_frame, accessBackingStore(PAGE_SIZE * page, 256))
+    mem.setLength(mem.getLength() + 1)
+    past_tracker.append(future_tracker.pop(0))
+    
+    return upd_frame
+
+def getNewFrameOPT(pt, future_tracker, past_tracker):
+    furthest = 0
+    for index, entry in enumerate(past_tracker):
+        if entry not in future_tracker:
+            past_tracker.pop(index)
+            return pt.getFrame(entry)
+        else:
+            i = future_tracker.index(entry)
+            if i > furthest:
+                furthest = i
+    return pt.getFrame(future_tracker[furthest])
+
 
 def main(argv):
-    print("Helloo")
     FRAMES = 256
     PRA = "FIFO"
     stats = StatTracker()
@@ -259,7 +302,7 @@ def main(argv):
     for i in range(1, len(argv)):
         if argv[i].isnumeric():
             FRAMES = int(argv[i])
-        elif argv[i] == "LRU" or argv == "OPT":
+        elif argv[i] == "LRU" or argv[i] == "OPT":
             PRA = argv[i]
             
     mem = PhysicalMemory(FRAMES)
@@ -267,7 +310,6 @@ def main(argv):
     if PRA == "FIFO":
         FIFO(vAddresses, tlb, page_table, mem, stats)
     elif PRA == "OPT":
-        print("DOing OPT!!")
         OPT(vAddresses, tlb, page_table, mem, stats)
     else:
         LRU(vAddresses, tlb, page_table, mem, stats)
